@@ -184,6 +184,33 @@ function updatePlayersList(room) {
 }
 
 // ── GAME INIT ─────────────────────────────────────
+function fitBoardSize() {
+    const boardEl = document.getElementById('board');
+    if (!boardEl) return;
+    
+    const isMobile = window.innerWidth <= 890;
+    let size;
+    
+    if (isMobile) {
+        // Fit width of screen with 32px padding, up to 520px
+        size = Math.min(window.innerWidth - 32, 520);
+    } else {
+        // Fit height of screen, leaving room for header, dice, and spacing
+        const headerHeight = 60;
+        const diceHeight = 200;
+        const spacing = 60;
+        const availableHeight = window.innerHeight - headerHeight - diceHeight - spacing;
+        const availableWidth = window.innerWidth - 360; // Leave 360px for the right column and gaps
+        size = Math.min(availableHeight, availableWidth, 520);
+        size = Math.max(size, 300); // Hard minimum limit to keep cells playable
+    }
+    
+    size = Math.floor(size);
+    boardEl.style.width = `${size}px`;
+    boardEl.style.height = `${size}px`;
+    console.log(`Board dimensions locked at ${size}x${size}px`);
+}
+
 function enterGame(room) {
     document.getElementById('landing-page').style.display = 'none';
     document.getElementById('waiting-room').style.display = 'none';
@@ -193,6 +220,10 @@ function enterGame(room) {
     document.getElementById('player-role').style.color = `var(--player-${STATE.myColor})`;
 
     STATE.gameState = room.gameState;
+    
+    // Fit the board dimensions to the device viewport once, making it completely constant
+    fitBoardSize();
+    
     initBoardUI();
     initDiceUI();
     syncUIWithState();
@@ -240,6 +271,7 @@ function syncUIWithState() {
     PLAYERS.forEach(color => {
         for (let i = 0; i < 6; i++) updateTokenPositionUI(color, i);
     });
+    arrangeTokensInCells();
     updateTurnUI();
 }
 
@@ -250,11 +282,62 @@ function updateTokenPositionUI(color, tokenIndex) {
     tokenEl.style.display = '';
     if (state.layer === 'home') {
         document.getElementById(`home-${color}`).appendChild(tokenEl);
+        tokenEl.style.position = '';
+        tokenEl.style.left = '';
+        tokenEl.style.top = '';
+        tokenEl.style.transform = '';
+        tokenEl.style.margin = '';
     } else {
         const cellId = PATHS[color][state.layer][state.index];
         document.getElementById(`cell-${cellId}`).appendChild(tokenEl);
     }
     tokenEl.classList.toggle('has-killed', !!state.hasKilled);
+}
+
+function arrangeTokensInCells() {
+    for (let i = 0; i < 49; i++) {
+        const cell = document.getElementById(`cell-${i}`);
+        if (!cell) continue;
+        const tokens = Array.from(cell.querySelectorAll('.token'));
+        if (tokens.length === 0) continue;
+
+        if (tokens.length === 1) {
+            const t = tokens[0];
+            t.style.position = 'absolute';
+            t.style.left = '50%';
+            t.style.top = '50%';
+            t.style.transform = 'translate(-50%, -50%)';
+            t.style.margin = '0';
+        } else {
+            const len = tokens.length;
+            tokens.forEach((t, idx) => {
+                t.style.position = 'absolute';
+                t.style.margin = '0';
+                
+                let x, y;
+                if (len === 2) {
+                    x = idx === 0 ? 30 : 70;
+                    y = 50;
+                } else if (len === 3) {
+                    if (idx === 0) { x = 50; y = 28; }
+                    else if (idx === 1) { x = 28; y = 72; }
+                    else { x = 72; y = 72; }
+                } else if (len === 4) {
+                    x = (idx % 2 === 0) ? 28 : 72;
+                    y = (idx < 2) ? 28 : 72;
+                } else {
+                    const angle = (idx / len) * 2 * Math.PI;
+                    const r = 24;
+                    x = 50 + r * Math.cos(angle);
+                    y = 50 + r * Math.sin(angle);
+                }
+                
+                t.style.left = `${x}%`;
+                t.style.top = `${y}%`;
+                t.style.transform = 'translate(-50%, -50%)';
+            });
+        }
+    }
 }
 
 function isMyTurn() {
@@ -419,6 +502,7 @@ function animateTokenMovement(color, tokenIndex, roll, onComplete) {
         if (!state.finished) {
             state.index = newIndex;
             updateTokenPositionUI(color, tokenIndex);
+            arrangeTokensInCells();
         }
         
         stepsRemaining--;
@@ -428,6 +512,7 @@ function animateTokenMovement(color, tokenIndex, roll, onComplete) {
             if (!state.finished) {
                 handleCaptureLocally(color, tokenIndex);
             }
+            arrangeTokensInCells();
             if (onComplete) onComplete();
         }
     }
@@ -450,6 +535,7 @@ function handleTokenClick(color, index) {
         tokenState.layer = 'outer'; tokenState.index = 0;
         updateTokenPositionUI(color, index);
         handleCaptureLocally(color, index);
+        arrangeTokensInCells();
         if (!STATE.gameState.winner) setTimeout(endTurnLocally, 500);
         else broadcastState();
     } else {

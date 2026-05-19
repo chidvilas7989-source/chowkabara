@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chowkabara – Epic 4-Player Strategy</title>
+  <meta name="description" content="Chowkabara: a premium 4-player multiplayer strategy board game. Roll dice, capture enemies, reach the center!">
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { outfit: ['Outfit', 'sans-serif'] } } }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+
+<body class="bg-black text-white font-outfit h-screen w-screen overflow-hidden">
+
+  <!-- ═══════════ LANDING PAGE ═══════════ -->
+  <div id="landing-page" class="page active flex-col items-center justify-center h-full overflow-y-auto py-8">
+    <div class="text-center mb-10">
+      <div class="logo-badge">🎲</div>
+      <h1 class="text-5xl font-extrabold tracking-tight neon-text mt-4">Chowkabara</h1>
+      <p class="text-gray-400 mt-2 text-lg tracking-wide">Epic Multiplayer Strategy · 4 Players</p>
+    </div>
+
+    <div id="lobby-controls" class="glass-card w-full max-w-sm p-6 space-y-4">
+      <!-- CREATE -->
+      <div class="accordion-item" id="acc-create">
+        <button class="accordion-header w-full flex justify-between items-center" onclick="toggleAccordion('create')">
+          <span class="flex items-center gap-2 font-semibold text-lg"><span class="acc-icon">🏠</span> Create Room</span>
+          <span class="acc-arrow text-amber-400 text-xl transition-transform duration-300" id="arrow-create">▾</span>
+        </button>
+        <div class="accordion-body" id="body-create">
+          <div class="space-y-3 pt-4">
+            <input id="player-name-create" type="text" placeholder="Your Name *" class="form-input" maxlength="15" />
+            <select id="player-color-create" class="form-input">
+              <option value="blue">🔵 Blue</option>
+              <option value="red">🔴 Red</option>
+              <option value="green">🟢 Green</option>
+              <option value="yellow">🟡 Yellow</option>
+            </select>
+            <button id="btn-create-hook" class="btn-primary w-full">Create Room</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- JOIN -->
+      <div class="accordion-item" id="acc-join">
+        <button class="accordion-header w-full flex justify-between items-center" onclick="toggleAccordion('join')">
+          <span class="flex items-center gap-2 font-semibold text-lg"><span class="acc-icon">🔗</span> Join Room</span>
+          <span class="acc-arrow text-amber-400 text-xl transition-transform duration-300" id="arrow-join">▾</span>
+        </button>
+        <div class="accordion-body" id="body-join">
+          <div class="space-y-3 pt-4">
+            <input id="player-name-join" type="text" placeholder="Your Name *" class="form-input" maxlength="15" />
+            <input id="join-room-id" type="text" placeholder="Room ID *" class="form-input" maxlength="6" style="text-transform:uppercase" />
+            <select id="player-color-join" class="form-input">
+              <option value="blue">🔵 Blue</option>
+              <option value="red">🔴 Red</option>
+              <option value="green">🟢 Green</option>
+              <option value="yellow">🟡 Yellow</option>
+            </select>
+            <button id="btn-join-hook" class="btn-secondary w-full">Join Room</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hidden inputs for main.js -->
+      <input type="hidden" id="player-name" />
+      <input type="hidden" id="player-color" />
+      <button id="btn-create" class="hidden"></button>
+      <button id="btn-join" class="hidden"></button>
+    </div>
+  </div>
+
+  <!-- ═══════════ WAITING ROOM ═══════════ -->
+  <div id="waiting-room" class="page flex-col items-center justify-center h-full" style="display:none;">
+    <div class="glass-card w-full max-w-sm p-8 text-center space-y-6">
+      <div>
+        <p class="text-gray-400 text-sm uppercase tracking-widest">Room Code</p>
+        <div class="flex items-center justify-center gap-3 mt-2">
+          <span id="display-room-id" class="room-id-display">------</span>
+        </div>
+      </div>
+      <div>
+        <p class="text-gray-400 text-sm uppercase tracking-widest mb-3">Players in Room</p>
+        <ul id="players-ul" class="space-y-2 text-left"></ul>
+      </div>
+      <div class="pt-2">
+        <p id="waiting-msg" class="text-amber-400 text-sm animate-pulse">Waiting for players...</p>
+      </div>
+      <div class="flex flex-col gap-3 pt-2">
+        <button id="btn-start" class="btn-primary" style="display:none;">⚔️ Start Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ GAME PAGE ═══════════ -->
+  <div id="game-page" class="page flex-col h-full" style="display:none; overflow:hidden;">
+    <!-- Header -->
+    <div class="game-header flex items-center justify-between px-4 py-2">
+      <div class="flex items-center gap-3">
+        <span class="text-amber-400 font-bold text-lg">🎲 Chowkabara</span>
+        <span class="room-pill" id="in-game-room">------</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-sm">You: <strong id="player-role" class="uppercase">...</strong></span>
+      </div>
+    </div>
+
+    <!-- Main game area -->
+    <div class="flex flex-1 flex-col lg:flex-row overflow-y-auto p-4 gap-6 items-center justify-center">
+
+      <!-- Left Panel -->
+      <div class="player-panel left-panel flex flex-col gap-6 w-full lg:w-64">
+        <div class="player-card glass-card p-4" id="player-green">
+          <h2 class="text-green-400 font-bold mb-3">🟢 Green</h2>
+          <div class="tokens-home flex gap-2 flex-wrap min-h-[44px]" id="home-green"></div>
+        </div>
+        <div class="player-card glass-card p-4" id="player-yellow">
+          <h2 class="text-yellow-400 font-bold mb-3">🟡 Yellow</h2>
+          <div class="tokens-home flex gap-2 flex-wrap min-h-[44px]" id="home-yellow"></div>
+        </div>
+      </div>
+
+      <!-- Center Board & Dice -->
+      <div class="board-container flex flex-col items-center gap-4">
+        <div class="game-board relative" id="board">
+          <!-- Grid cells generated by JS -->
+        </div>
+
+        <!-- ★ DICE SECTION ★ -->
+        <div class="dice-container glass-card p-5 flex flex-col items-center gap-4 w-full max-w-sm">
+          <!-- SVG Dice lives here -->
+          <div id="dice-svg-container" class="flex justify-center"></div>
+
+          <div class="flex items-center gap-4 w-full">
+            <button id="roll-button" class="btn-primary flex-1 text-lg py-3">🎲 Roll Dice</button>
+            <div id="dice-result" class="text-5xl font-black text-amber-400 w-14 text-center">--</div>
+          </div>
+
+          <div id="game-status" class="text-sm font-semibold tracking-wider uppercase text-gray-300 text-center">
+            Waiting for game sync...
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="player-panel right-panel flex flex-col gap-6 w-full lg:w-64">
+        <div class="player-card glass-card p-4" id="player-blue">
+          <h2 class="text-blue-400 font-bold mb-3">🔵 Blue</h2>
+          <div class="tokens-home flex gap-2 flex-wrap min-h-[44px]" id="home-blue"></div>
+        </div>
+        <div class="player-card glass-card p-4" id="player-red">
+          <h2 class="text-red-400 font-bold mb-3">🔴 Red</h2>
+          <div class="tokens-home flex gap-2 flex-wrap min-h-[44px]" id="home-red"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/static/js/dice.js"></script>
+  <script src="/static/js/main.js"></script>
+  <script>
+    // Accordion Logic
+    function toggleAccordion(id) {
+      document.querySelectorAll('.accordion-body').forEach(b => b.classList.remove('open'));
+      document.querySelectorAll('.acc-arrow').forEach(a => a.classList.remove('open'));
+      const body = document.getElementById('body-' + id);
+      const arrow = document.getElementById('arrow-' + id);
+      const isOpen = body.classList.contains('open');
+      if (!isOpen) { body.classList.add('open'); arrow.classList.add('open'); }
+    }
+
+    document.getElementById('btn-create-hook').addEventListener('click', () => {
+      document.getElementById('player-name').value  = document.getElementById('player-name-create').value;
+      document.getElementById('player-color').value = document.getElementById('player-color-create').value;
+      document.getElementById('btn-create').click();
+    });
+    document.getElementById('btn-join-hook').addEventListener('click', () => {
+      document.getElementById('player-name').value  = document.getElementById('player-name-join').value;
+      document.getElementById('player-color').value = document.getElementById('player-color-join').value;
+      document.getElementById('btn-join').click();
+    });
+
+    const savedName = localStorage.getItem('chowkabara_name');
+    if (savedName) {
+      document.getElementById('player-name-create').value = savedName;
+      document.getElementById('player-name-join').value   = savedName;
+    }
+    toggleAccordion('create');
+  </script>
+</body>
+</html>

@@ -7,25 +7,15 @@ import json
 
 load_dotenv()
 
-app = Flask(__name__, static_folder='.', static_url_path='', template_folder='.')
+app = Flask(__name__)
 app.config['SECRET_KEY'] = 'chowkabara_secret_key_123'
 socketio = SocketIO(app, cors_allowed_origins='*')
 
 room_manager = RoomManager()
 
-# Load Firebase Config from env
-firebase_config = {
-    "apiKey": os.getenv("FIREBASE_API_KEY", ""),
-    "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN", ""),
-    "projectId": os.getenv("FIREBASE_PROJECT_ID", ""),
-    "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET", ""),
-    "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID", ""),
-    "appId": os.getenv("FIREBASE_APP_ID", "")
-}
-
 @app.route('/')
 def index():
-    return render_template('index.html', firebase_config=json.dumps(firebase_config))
+    return render_template('index.html')
 
 # Socket.IO Events
 
@@ -50,16 +40,19 @@ def on_rejoin_room(data):
         join_room(room['id'])
         emit('room_joined', {'room': room, 'rejoined': True}, to=request.sid)
         emit('player_rejoined', {'room': room}, room=room['id'])
+    else:
+        emit('rejoin_failed', to=request.sid)
 
 @socketio.on('create_room')
 def on_create_room(data):
     name = data.get('name', 'Player')
     uid = data.get('uid')
+    color = data.get('color', 'blue')
     if not uid:
         emit('error', {'message': 'Not authenticated'})
         return
         
-    room_id = room_manager.create_room(name, request.sid, uid)
+    room_id = room_manager.create_room(name, request.sid, uid, color)
     join_room(room_id)
     room = room_manager.get_room(room_id)
     emit('room_created', {'room': room})
@@ -69,12 +62,13 @@ def on_join_room(data):
     name = data.get('name', 'Player')
     uid = data.get('uid')
     room_id = data.get('room_id')
+    color = data.get('color', 'red')
     
     if not uid or not room_id:
         emit('error', {'message': 'Invalid input'})
         return
         
-    room, error = room_manager.join_room(room_id.upper(), name, request.sid, uid)
+    room, error = room_manager.join_room(room_id.upper(), name, request.sid, uid, color)
     if error:
         emit('error', {'message': error})
     else:
@@ -110,4 +104,4 @@ def on_leave_room(data):
 
 if __name__ == '__main__':
     # Use geventwebsocket for production
-    socketio.run(app, debug=True, port=5000)
+    socketio.run(app, debug=True, port=5001)

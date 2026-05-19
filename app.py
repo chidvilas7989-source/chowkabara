@@ -1,21 +1,109 @@
-from flask import Flask, send_from_directory
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, emit, join_room, leave_room
+from room_manager import RoomManager
+from dotenv import load_dotenv
 import os
 
-# Initialize Flask app
-# Serving static files from the current directory
-app = Flask(__name__, static_folder='.', static_url_path='')
+load_dotenv()
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'chowkabara_secret_2024')
+socketio = SocketIO(app, cors_allowed_origins='*')
+
+room_manager = RoomManager()
+
+# ─── HTTP Routes ──────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
-    """Route to serve the main game HTML file."""
-    return send_from_directory('.', 'index.html')
+    return render_template('index.html')
 
-@app.route('/api/status')
-def status():
-    """A sample API route for potential future backend game state management."""
-    return {"status": "Backend is running", "game": "Chowkabara"}
+# ─── Socket.IO Events ─────────────────────────────────────────────────────────
+
+@socketio.on('connect')
+def on_connect():
+    print(f"[+] Client connected: {request.sid}")
+
+@socketio.on('disconnect')
+def on_disconnect():
+    print(f"[-] Client disconnected: {request.sid}")
+    room_id, room = room_manager.mark_offline(request.sid)
+    if room_id:
+        emit('player_offline', {'room': room}, room=room_id)
+
+@socketio.on('rejoin_room')
+def on_rejoin_room(data):
+    uid = data.get('uid')
+    if not uid:
+        return
+    room = room_manager.rejoin_room(uid, request.sid)
+    if room:
+        join_room(room['id'])
+        emit('room_joined', {'room': room, 'rejoined': True}, to=request.sid)
+        emit('player_rejoined', {'room': room}, room=room['id'])
+    else:
+        emit('rejoin_failed', to=request.sid)
+
+@socketio.on('create_room')
+def on_create_room(data):
+    name  = data.get('name', 'Player')
+    uid   = data.get('uid')
+    color = data.get('color', 'blue')
+    if not uid:
+        emit('error', {'message': 'Not authenticated'})
+        return
+    room_id = room_manager.create_room(name, request.sid, uid, color)
+    join_room(room_id)
+    room = room_manager.get_room(room_id)
+    emit('room_created', {'room': room})
+
+@socketio.on('join_room')
+def on_join_room(data):
+    name    = data.get('name', 'Player')
+    uid     = data.get('uid')
+    room_id = data.get('room_id', '').upper()
+    color   = data.get('color', 'red')
+    if not uid or not room_id:
+        emit('error', {'message': 'Invalid input'})
+        return
+    room, error = room_manager.join_room(room_id, name, request.sid, uid, color)
+    if error:
+        emit('error', {'message': error})
+    else:
+        join_room(room_id)
+        emit('room_joined', {'room': room}, to=request.sid)
+        emit('player_joined', {'room': room}, room=room_id)
+
+@socketio.on('start_game')
+def on_start_game(data):
+    room_id = data.get('room_id')
+    if room_manager.start_game(room_id):
+        room = room_manager.get_room(room_id)
+        emit('game_started', {'room': room}, room=room_id)
+    else:
+        emit('error', {'message': 'Need at least 2 players to start'})
+
+@socketio.on('sync_game_state')
+def on_sync_game_state(data):
+    room_id   = data.get('room_id')
+    new_state = data.get('gameState')
+    room = room_manager.update_game_state(room_id, new_state)
+    if room:
+        emit('game_state_updated', {'gameState': new_state}, room=room_id, include_self=False)
+
+@socketio.on('leave_room')
+def on_leave_room(data):
+    uid = data.get('uid')
+    room_id, room = room_manager.leave_room_completely(uid)
+    if room_id:
+        leave_room(room_id)
+        emit('player_left', {'room': room}, room=room_id)
+
+# ─── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    print("Starting Chowkabara Game Server...")
-    print("Running on http://localhost:5000")
-    app.run(debug=True, port=5000)
+    print("=" * 50)
+    print("  Chowkabara Game Server")
+    print("  http://localhost:5000")
+    print("=" * 50)
+    socketio.run(app, debug=True, port=5000)

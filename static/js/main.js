@@ -192,17 +192,22 @@ function fitBoardSize() {
     let size;
     
     if (isMobile) {
-        // Fit width of screen with 32px padding, up to 520px
-        size = Math.min(window.innerWidth - 32, 520);
+        // Mobile stacked layout: Board on top, Dice + Capsule side-by-side below.
+        const headerHeight = 52;
+        const controlsHeight = 230; // Matches dice container and player capsule height
+        const spacing = 24;
+        const availableHeight = window.innerHeight - headerHeight - controlsHeight - spacing;
+        const availableWidth = window.innerWidth - 16; // 8px margin on each side
+        size = Math.min(availableWidth, availableHeight, 520);
+        size = Math.max(size, 260); // Keep cells playable
     } else {
-        // Fit height of screen, leaving room for header, dice, and spacing
+        // Desktop layout: Board on left, controls stacked on right.
         const headerHeight = 60;
-        const diceHeight = 200;
-        const spacing = 60;
-        const availableHeight = window.innerHeight - headerHeight - diceHeight - spacing;
-        const availableWidth = window.innerWidth - 360; // Leave 360px for the right column and gaps
+        const spacing = 40;
+        const availableHeight = window.innerHeight - headerHeight - spacing;
+        const availableWidth = window.innerWidth - 300; // Leave 300px for Right Column
         size = Math.min(availableHeight, availableWidth, 520);
-        size = Math.max(size, 300); // Hard minimum limit to keep cells playable
+        size = Math.max(size, 300);
     }
     
     size = Math.floor(size);
@@ -221,7 +226,7 @@ function enterGame(room) {
 
     STATE.gameState = room.gameState;
     
-    // Fit the board dimensions to the device viewport once, making it completely constant
+    // Fit the board dimensions to the device viewport
     fitBoardSize();
     
     initBoardUI();
@@ -229,10 +234,19 @@ function enterGame(room) {
     syncUIWithState();
 }
 
+// Add window resize listener to keep layout perfectly aligned
+window.addEventListener('resize', () => {
+    if (document.getElementById('game-page').style.display === 'flex') {
+        fitBoardSize();
+        arrangeTokensInCells();
+    }
+});
+
 function initDiceUI() {
     const container = document.getElementById('dice-svg-container');
     container.innerHTML = '';
-    svgDice = new SVGDice('dice-svg-container', { size: 110 });
+    const diceSize = window.innerWidth <= 480 ? 90 : 110;
+    svgDice = new SVGDice('dice-svg-container', { size: diceSize });
     svgDice.setColor(STATE.myColor || 'default');
     svgDice.reset();
 }
@@ -268,6 +282,22 @@ function initBoardUI() {
 }
 
 function syncUIWithState() {
+    // Hide player capsules for other players. Only show the capsule of STATE.myColor (if set)
+    PLAYERS.forEach(color => {
+        const capsule = document.getElementById(`player-${color}`);
+        if (capsule) {
+            if (STATE.myColor) {
+                if (color === STATE.myColor) {
+                    capsule.style.display = 'flex';
+                } else {
+                    capsule.style.display = 'none';
+                }
+            } else {
+                capsule.style.display = 'flex';
+            }
+        }
+    });
+
     PLAYERS.forEach(color => {
         for (let i = 0; i < 6; i++) updateTokenPositionUI(color, i);
     });

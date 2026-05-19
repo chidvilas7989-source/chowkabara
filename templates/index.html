@@ -15,6 +15,39 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css" />
+  
+  <!-- Firebase SDK Integration -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // Inject config from server environment variables
+    const firebaseConfig = {{ firebase_config | safe }};
+
+    if (firebaseConfig && firebaseConfig.apiKey) {
+      try {
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Make auth and db globally available
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.signInAnonymously = signInAnonymously;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.updateDoc = updateDoc;
+        window.arrayUnion = arrayUnion;
+        console.log("Firebase SDK initialized successfully.");
+      } catch (e) {
+        console.error("Firebase SDK failed to initialize:", e);
+      }
+    } else {
+      console.log("No Firebase config provided. Bypassing Firebase initialization.");
+    }
+  </script>
 </head>
 
 <body class="bg-black text-white font-outfit h-screen w-screen overflow-hidden">

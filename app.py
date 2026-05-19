@@ -6,6 +6,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from room_manager import RoomManager
 from dotenv import load_dotenv
 import os
+import json
 
 load_dotenv()
 
@@ -15,11 +16,21 @@ socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet')
 
 room_manager = RoomManager()
 
+# Load Firebase Config from env
+firebase_config = {
+    "apiKey": os.getenv("FIREBASE_API_KEY", ""),
+    "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN", ""),
+    "projectId": os.getenv("FIREBASE_PROJECT_ID", ""),
+    "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET", ""),
+    "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID", ""),
+    "appId": os.getenv("FIREBASE_APP_ID", "")
+}
+
 # ─── HTTP Routes ──────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', firebase_config=json.dumps(firebase_config))
 
 # ─── Socket.IO Events ─────────────────────────────────────────────────────────
 

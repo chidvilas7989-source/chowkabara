@@ -27,12 +27,42 @@ let STATE = {
 
 // ── INIT ──────────────────────────────────────────
 function initApp() {
-    if (!STATE.uid) {
-        STATE.uid = 'player_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('chowkabara_uid', STATE.uid);
+    if (window.onAuthStateChanged && window.firebaseAuth) {
+        window.onAuthStateChanged(window.firebaseAuth, (user) => {
+            if (user) {
+                STATE.uid = user.uid;
+                localStorage.setItem('chowkabara_uid', user.uid);
+                console.log("Authenticated with Firebase. UID:", user.uid);
+                connectSocket();
+            } else {
+                window.signInAnonymously(window.firebaseAuth)
+                    .then(() => {
+                        console.log("Signing in anonymously to Firebase...");
+                    })
+                    .catch(err => {
+                        console.error("Firebase auth error:", err);
+                        fallbackToLocalAuth();
+                    });
+            }
+        });
+    } else {
+        console.log("Firebase not configured. Using local guest account.");
+        fallbackToLocalAuth();
     }
+
     if (STATE.playerName) {
         document.getElementById('player-name').value = STATE.playerName;
+        const nameCreate = document.getElementById('player-name-create');
+        const nameJoin = document.getElementById('player-name-join');
+        if (nameCreate) nameCreate.value = STATE.playerName;
+        if (nameJoin) nameJoin.value = STATE.playerName;
+    }
+}
+
+function fallbackToLocalAuth() {
+    if (!STATE.uid || STATE.uid.startsWith('player_') === false) {
+        STATE.uid = 'player_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('chowkabara_uid', STATE.uid);
     }
     connectSocket();
 }
@@ -48,8 +78,49 @@ function connectSocket() {
         }
     });
 
-    STATE.socket.on('room_created',      (d) => enterWaitingRoom(d.room));
-    STATE.socket.on('room_joined',       (d) => { enterWaitingRoom(d.room); if (d.rejoined && d.room.status === 'playing') enterGame(d.room); });
+    STATE.socket.on('room_created', async (d) => {
+        enterWaitingRoom(d.room);
+        if (window.firebaseDb) {
+            try {
+                await window.setDoc(window.doc(window.firebaseDb, "rooms", d.room.id), {
+                    roomId: d.room.id,
+                    status: "waiting",
+                    createdAt: new Date().toISOString(),
+                    players: [{
+                        uid: STATE.uid,
+                        name: STATE.playerName,
+                        color: STATE.myColor || "blue",
+                        joinedAt: new Date().toISOString()
+                    }]
+                });
+            } catch (e) {
+                console.error("Error saving room to Firestore: ", e);
+            }
+        }
+    });
+
+    STATE.socket.on('room_joined', async (d) => {
+        enterWaitingRoom(d.room);
+        if (d.rejoined && d.room.status === 'playing') {
+            enterGame(d.room);
+        } else if (!d.rejoined) {
+            if (window.firebaseDb) {
+                try {
+                    await window.updateDoc(window.doc(window.firebaseDb, "rooms", d.room.id), {
+                        players: window.arrayUnion({
+                            uid: STATE.uid,
+                            name: STATE.playerName,
+                            color: STATE.myColor || "unknown",
+                            joinedAt: new Date().toISOString()
+                        })
+                    });
+                } catch (e) {
+                    console.error("Error updating room in Firestore: ", e);
+                }
+            }
+        }
+    });
+
     STATE.socket.on('player_joined',     (d) => updatePlayersList(d.room));
     STATE.socket.on('player_offline',    (d) => updatePlayersList(d.room));
     STATE.socket.on('player_rejoined',   (d) => updatePlayersList(d.room));

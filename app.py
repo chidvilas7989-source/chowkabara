@@ -105,8 +105,9 @@ def on_leave_room(data):
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
     print("=" * 50)
-    print("  Chowkabara Game Server")
-    print("  http://localhost:5000")
+    print(f"  Chowkabara Game Server")
+    print(f"  Running on http://0.0.0.0:{port}")
     print("=" * 50)
-    socketio.run(app, debug=True, port=5000)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)

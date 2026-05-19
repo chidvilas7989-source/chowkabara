@@ -106,5 +106,9 @@ def on_leave_room(data):
         emit('player_left', {'room': room}, room=room_id)
 
 if __name__ == '__main__':
-    # Use geventwebsocket for production
-    socketio.run(app, debug=True, port=5001)
+    port = int(os.environ.get('PORT', 5001))
+    print("=" * 50)
+    print(f"  Chowkabara Game Server")
+    print(f"  Running on http://0.0.0.0:{port}")
+    print("=" * 50)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)

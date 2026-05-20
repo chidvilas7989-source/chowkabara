@@ -72,8 +72,7 @@ function connectSocket() {
 
     STATE.socket.on('connect', () => {
         console.log('Socket connected');
-        const savedRoom = localStorage.getItem('chowkabara_room');
-        if (savedRoom && STATE.uid) {
+        if (STATE.uid) {
             STATE.socket.emit('rejoin_room', { uid: STATE.uid });
         }
     });
@@ -441,6 +440,16 @@ function checkValidMovesLocally() {
     if (!hasValidMove) setTimeout(endTurnLocally, 1500);
 }
 
+function playerHasKilled(color) {
+    if (STATE.gameState && STATE.gameState.playerHasKilled && STATE.gameState.playerHasKilled[color]) {
+        return true;
+    }
+    if (STATE.gameState && STATE.gameState.tokens && STATE.gameState.tokens[color]) {
+        return STATE.gameState.tokens[color].some(t => t.hasKilled);
+    }
+    return false;
+}
+
 function canMove(tokenState, color, roll) {
     const { layer, index } = tokenState;
     if (layer === 'outer') return true;
@@ -468,7 +477,7 @@ function handleTokenMouseEnter(color, index) {
         if (currentLayer === 'outer') {
             const len = PATHS[color].outer.length;
             if (newIndex >= len) {
-                if (tokenState.hasKilled) { currentLayer = 'mid'; newIndex = newIndex - len; }
+                if (playerHasKilled(color)) { currentLayer = 'mid'; newIndex = newIndex - len; }
                 else { newIndex = newIndex % len; }
             }
         } else if (currentLayer === 'mid') {
@@ -512,7 +521,7 @@ function animateTokenMovement(color, tokenIndex, roll, onComplete) {
         if (state.layer === 'outer') {
             const len = PATHS[color].outer.length;
             if (newIndex >= len) {
-                if (state.hasKilled) { state.layer = 'mid'; newIndex = 0; }
+                if (playerHasKilled(color)) { state.layer = 'mid'; newIndex = 0; }
                 else { newIndex = newIndex % len; }
             }
         } else if (state.layer === 'mid') {
@@ -591,6 +600,10 @@ function handleCaptureLocally(color, tokenIndex) {
                     opp.layer = 'home'; opp.index = -1; opp.hasKilled = false;
                     updateTokenPositionUI(opponent, i);
                     state.hasKilled = true;
+                    if (!STATE.gameState.playerHasKilled) {
+                        STATE.gameState.playerHasKilled = { blue: false, red: false, green: false, yellow: false };
+                    }
+                    STATE.gameState.playerHasKilled[color] = true;
                     updateTokenPositionUI(color, tokenIndex);
                     STATE.gameState.extraTurn = true;
                     showToast(`💥 ${color.toUpperCase()} captured ${opponent.toUpperCase()}!`, 'capture');
@@ -732,6 +745,57 @@ function showToast(msg, type = 'info') {
     clearTimeout(toast._t);
     toast._t = setTimeout(() => { toast.classList.remove('show'); }, 2800);
 }
+
+// ── LEAVE GAME EVENT LISTENERS ────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    const btnLeave = document.getElementById('btn-leave-game');
+    const modalLeave = document.getElementById('leave-modal');
+    const confirmYes = document.getElementById('confirm-leave-yes');
+    const confirmNo = document.getElementById('confirm-leave-no');
+
+    if (btnLeave && modalLeave && confirmYes && confirmNo) {
+        btnLeave.addEventListener('click', () => {
+            modalLeave.style.display = 'flex';
+        });
+
+        confirmNo.addEventListener('click', () => {
+            modalLeave.style.display = 'none';
+        });
+
+        confirmYes.addEventListener('click', () => {
+            modalLeave.style.display = 'none';
+            if (STATE.socket && STATE.uid) {
+                STATE.socket.emit('leave_room', { uid: STATE.uid });
+            }
+            localStorage.removeItem('chowkabara_room');
+            document.getElementById('landing-page').style.display = 'flex';
+            document.getElementById('game-page').style.display = 'none';
+            document.getElementById('waiting-room').style.display = 'none';
+            STATE.roomId = '';
+            STATE.gameState = null;
+        });
+    }
+
+    const btnCopy = document.getElementById('btn-copy-room');
+    if (btnCopy) {
+        btnCopy.addEventListener('click', () => {
+            const roomId = document.getElementById('display-room-id').innerText;
+            if (roomId && roomId !== '------') {
+                navigator.clipboard.writeText(roomId).then(() => {
+                    showToast('📋 Room code copied!', 'success');
+                }).catch(err => {
+                    const el = document.createElement('textarea');
+                    el.value = roomId;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                    showToast('📋 Room code copied!', 'success');
+                });
+            }
+        });
+    }
+});
 
 // ── START ─────────────────────────────────────────
 window.onload = initApp;

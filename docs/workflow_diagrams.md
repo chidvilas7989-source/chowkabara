@@ -46,7 +46,7 @@ flowchart TD
     PerformCapture --> LapCheck
     
     LapCheck -- No --> MoveOuter
-    LapCheck -- Yes --> CaptureQualify{Has token captured an opponent - hasKilled == true?}
+    LapCheck -- Yes --> CaptureQualify{Has player captured an opponent - playerHasKilled == true?}
     
     CaptureQualify -- No --> WrapAround[Wrap around outer ring start index - continue outer lap]
     WrapAround --> MoveOuter

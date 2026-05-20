@@ -153,7 +153,8 @@ class RoomManager:
             'currentRoll': None,
             'hasRolled': False,
             'extraTurn': False,
-            'winner': None
+            'winner': None,
+            'playerHasKilled': { 'blue': False, 'red': False, 'green': False, 'yellow': False }
         }
 
     def update_game_state(self, room_id, new_state):

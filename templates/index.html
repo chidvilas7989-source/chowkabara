@@ -175,7 +175,12 @@
           <div id="game-status" class="text-sm font-semibold tracking-wider uppercase text-gray-300 text-center">
             Waiting for game sync...
           </div>
+
+          <button id="btn-leave-game" class="btn-leave w-full mt-2 hidden md:block">🚪 Leave Game</button>
         </div>
+
+        <!-- Mobile Leave Game Button (visible only on small screens, under the dice container or in it) -->
+        <button id="btn-leave-game-mobile" class="btn-leave w-full block md:hidden mb-4">🚪 Leave Game</button>
 
         <div class="player-capsules-container">
           
@@ -218,10 +223,6 @@
         </div>
       </div>
 
-    </div>
-    <!-- Bottom Actions / Footer -->
-    <div class="game-footer flex justify-center py-3 bg-black/45 border-t border-white/5 backdrop-blur-md">
-      <button id="btn-leave-game" class="btn-leave">🚪 Leave Game</button>
     </div>
   </div>
 

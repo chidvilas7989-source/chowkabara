@@ -95,10 +95,31 @@ class RoomManager:
         for room_id, room in self.rooms.items():
             for i, p in enumerate(room['players']):
                 if p['uid'] == uid:
-                    room['players'].pop(i)
+                    left_player = room['players'].pop(i)
+                    if room['status'] == 'playing':
+                        if len(room['players']) < 2:
+                            del self.rooms[room_id]
+                            self.save_data()
+                            return room_id, None, left_player
+                        else:
+                            if 'gameState' in room and 'turnOrder' in room['gameState']:
+                                to = room['gameState']['turnOrder']
+                                c_idx = room['gameState']['currentPlayerIndex']
+                                if len(to) > c_idx:
+                                    current_color = to[c_idx]
+                                else:
+                                    current_color = to[0]
+                                if left_player['color'] in to:
+                                    to.remove(left_player['color'])
+                                    for t in room['gameState']['tokens'][left_player['color']]:
+                                        t['finished'] = True
+                                if current_color in to:
+                                    room['gameState']['currentPlayerIndex'] = to.index(current_color)
+                                else:
+                                    room['gameState']['currentPlayerIndex'] = 0
                     self.save_data()
-                    return room_id, room
-        return None, None
+                    return room_id, room, left_player
+        return None, None, None
 
     def mark_offline(self, sid):
         for room_id, room in self.rooms.items():

@@ -110,10 +110,14 @@ def on_sync_game_state(data):
 @socketio.on('leave_room')
 def on_leave_room(data):
     uid = data.get('uid')
-    room_id, room = room_manager.leave_room_completely(uid)
+    room_id, room, left_player = room_manager.leave_room_completely(uid)
     if room_id:
         leave_room(room_id)
-        emit('player_left', {'room': room}, room=room_id)
+        if room is None:
+            emit('room_closed', {'reason': 'not_enough_players'}, room=room_id)
+        else:
+            emit('player_left_game', {'room': room, 'left_player': left_player}, room=room_id)
+            emit('player_left', {'room': room}, room=room_id)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

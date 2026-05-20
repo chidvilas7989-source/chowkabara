@@ -126,6 +126,23 @@ function connectSocket() {
     STATE.socket.on('player_left',       (d) => updatePlayersList(d.room));
     STATE.socket.on('game_started',      (d) => enterGame(d.room));
     STATE.socket.on('game_state_updated',(d) => { STATE.gameState = d.gameState; syncUIWithState(); });
+    
+    STATE.socket.on('room_closed', (d) => {
+        showToast('Room closed: ' + d.reason, 'error');
+        localStorage.removeItem('chowkabara_room');
+        document.getElementById('landing-page').style.display = 'flex';
+        document.getElementById('waiting-room').style.display = 'none';
+        document.getElementById('game-page').style.display = 'none';
+        STATE.roomId = '';
+        STATE.gameState = null;
+    });
+
+    STATE.socket.on('player_left_game', (d) => {
+        showToast(`🚪 ${d.left_player.name || d.left_player.color} exited the room`, 'info');
+        STATE.gameState = d.room.gameState;
+        syncUIWithState();
+    });
+
     STATE.socket.on('rejoin_failed',     () => {
         localStorage.removeItem('chowkabara_room');
         document.getElementById('landing-page').style.display = 'flex';
@@ -748,16 +765,20 @@ function showToast(msg, type = 'info') {
 
 // ── LEAVE GAME EVENT LISTENERS ────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    const btnLeave = document.getElementById('btn-leave-game');
+    const btnLeaveDesktop = document.getElementById('btn-leave-game');
+    const btnLeaveMobile = document.getElementById('btn-leave-game-mobile');
     const modalLeave = document.getElementById('leave-modal');
     const confirmYes = document.getElementById('confirm-leave-yes');
     const confirmNo = document.getElementById('confirm-leave-no');
 
-    if (btnLeave && modalLeave && confirmYes && confirmNo) {
-        btnLeave.addEventListener('click', () => {
-            modalLeave.style.display = 'flex';
-        });
+    const showLeaveModal = () => {
+        if(modalLeave) modalLeave.style.display = 'flex';
+    };
 
+    if (btnLeaveDesktop) btnLeaveDesktop.addEventListener('click', showLeaveModal);
+    if (btnLeaveMobile) btnLeaveMobile.addEventListener('click', showLeaveModal);
+
+    if (modalLeave && confirmYes && confirmNo) {
         confirmNo.addEventListener('click', () => {
             modalLeave.style.display = 'none';
         });
